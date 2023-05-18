@@ -50,72 +50,79 @@ class Verify(commands.Cog):
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
-        with open("Data/config.json", "r+", encoding="utf-8") as f:
-            config = json.load(f)
-            roleid = config["role_id"]
+        try:
 
-        if interaction.data['custom_id'].startswith("verify"):
-            member = interaction.guild.get_member(interaction.user.id)
-            role = interaction.guild.get_role(roleid)
+            with open("Data/config.json", "r+", encoding="utf-8") as f:
+                config = json.load(f)
+                roleid = config["role_id"]
 
-            if role in member.roles:
-                await interaction.response.send_message("You are already verified!", ephemeral=True)
-                return
+            if interaction.data['custom_id'].startswith("verify"):
+                member = interaction.guild.get_member(interaction.user.id)
+                role = interaction.guild.get_role(roleid)
 
-            code = "".join(random.choices(string.ascii_letters + string.digits, k=8))
-            emb = discord.Embed(title="Verification", description=f"", colour=discord.Colour.green())
-            emb.add_field(name=f"Code", value=f"``{code}``\n\nYou have 5 minutes to reply with the code above to verify yourself in **{interaction.guild.name}**.", inline=False)
-            try:
-                await interaction.user.send(embed=emb)
-            except Exception as exc:
-                await interaction.response.send_message("Please allow DM's from this bot to verify.", ephemeral=True)
-                return exc
-
-            await interaction.response.send_message("Check your DM's to complete verification.", ephemeral=True)
-
-            def checker(m):
-                return m.author.id == interaction.user.id and m.channel.id == interaction.user.dm_channel.id
-
-            while True:
-                try:
-                    result = await self.client.wait_for("message", check=checker, timeout=300)
-                    if result.content != code:
-                        await result.reply("Invalid code! Try again.")
-                        continue
-                    else:
-                        if interaction.user.id in self.client.waiting:
-                            result1 = Verify.connect(self)
-                            if result1 is None:
-                                return
-
-                            conn = result1[0]
-                            curs = result1[1]
-
-                            query = f"""INSERT OR IGNORE INTO users(id, points, invites) VALUES({self.client.waiting[interaction.user.id]}, 0, 0)"""
-                            curs.execute(query)
-                            conn.commit()
-                            query = f"""SELECT * FROM users WHERE id={self.client.waiting[interaction.user.id]}"""
-                            curs.execute(query)
-                            records = curs.fetchall()
-                            points = records[0][1]
-                            invites = records[0][2]
-                            invites += 1
-                            points += 100
-                            query = f"""UPDATE users SET (invites, points) = ({invites}, {points}) WHERE id={self.client.waiting[interaction.user.id]}"""
-                            curs.execute(query)
-                            conn.commit()
-                            conn.close()
-                            del self.client.waiting[interaction.user.id]
-
-                        await result.reply(f"You are now verified in **{interaction.guild.name}**")
-                        await member.add_roles(role)
-                        return
-                except asyncio.TimeoutError:
-                    await interaction.user.send("Verification cancelled.")
+                if role in member.roles:
+                    await interaction.response.send_message("You are already verified!", ephemeral=True)
                     return
+
+                code = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+                emb = discord.Embed(title="Verification", description=f"", colour=discord.Colour.green())
+                emb.add_field(name=f"Code",
+                              value=f"``{code}``\n\nYou have 5 minutes to reply with the code above to verify yourself in **{interaction.guild.name}**.",
+                              inline=False)
+                try:
+                    await interaction.user.send(embed=emb)
                 except Exception as exc:
-                    print(exc)
+                    await interaction.response.send_message("Please allow DM's from this bot to verify.",
+                                                            ephemeral=True)
                     return exc
+
+                await interaction.response.send_message("Check your DM's to complete verification.", ephemeral=True)
+
+                def checker(m):
+                    return m.author.id == interaction.user.id and m.channel.id == interaction.user.dm_channel.id
+
+                while True:
+                    try:
+                        result = await self.client.wait_for("message", check=checker, timeout=300)
+                        if result.content != code:
+                            await result.reply("Invalid code! Try again.")
+                            continue
+                        else:
+                            if interaction.user.id in self.client.waiting:
+                                result1 = Verify.connect(self)
+                                if result1 is None:
+                                    return
+
+                                conn = result1[0]
+                                curs = result1[1]
+
+                                query = f"""INSERT OR IGNORE INTO users(id, points, invites) VALUES({self.client.waiting[interaction.user.id]}, 0, 0)"""
+                                curs.execute(query)
+                                conn.commit()
+                                query = f"""SELECT * FROM users WHERE id={self.client.waiting[interaction.user.id]}"""
+                                curs.execute(query)
+                                records = curs.fetchall()
+                                points = records[0][1]
+                                invites = records[0][2]
+                                invites += 1
+                                points += 100
+                                query = f"""UPDATE users SET (invites, points) = ({invites}, {points}) WHERE id={self.client.waiting[interaction.user.id]}"""
+                                curs.execute(query)
+                                conn.commit()
+                                conn.close()
+                                del self.client.waiting[interaction.user.id]
+
+                            await result.reply(f"You are now verified in **{interaction.guild.name}**")
+                            await member.add_roles(role)
+                            return
+                    except asyncio.TimeoutError:
+                        await interaction.user.send("Verification cancelled.")
+                        return
+                    except Exception as exc:
+                        print(exc)
+                        return exc
+        except Exception as exc:
+            raise(exc)
 
 
 
