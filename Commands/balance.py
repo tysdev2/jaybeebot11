@@ -38,15 +38,19 @@ class Balance(commands.Cog):
 
 
     @commands.Cog.listener()
+    async def on_member_remove(self, member: discord.Member):
+        invs_after = await member.guild.invites()
+        self.invites[member.guild.id] = invs_after
+
+
+    @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         try:
-            invs_before = self.invites[member.guild.id]
-            invs_after = await member.guild.invites()
-            self.invites[member.guild.id] = invs_after
-
-            
             result = Balance.connect(self)
             if result is None:
+                invs_before = self.invites[member.guild.id]
+                invs_after = await member.guild.invites()
+                self.invites[member.guild.id] = invs_after
                 return
 
             conn = result[0]
@@ -58,10 +62,16 @@ class Balance(commands.Cog):
             conn.close()
 
             diff = (member.joined_at - member.created_at).total_seconds()
+            print(diff)
             if diff < 1814400:  # under 21 days old
+                invs_before = self.invites[member.guild.id]
+                invs_after = await member.guild.invites()
+                self.invites[member.guild.id] = invs_after
                 return
 
-
+            invs_before = self.invites[member.guild.id]
+            invs_after = await member.guild.invites()
+            self.invites[member.guild.id] = invs_after
             for invite in invs_before:
                 if invite.uses < self.find_invite_by_code(invs_after, invite.code).uses:
                     self.client.waiting[member.id] = invite.inviter.id
@@ -70,7 +80,11 @@ class Balance(commands.Cog):
                     # else:
                         # self.client.waiting[invite.inviter.id].append(member.id)
         except Exception as exc:
-            print(exc)
+
+            invs_before = self.invites[member.guild.id]
+            invs_after = await member.guild.invites()
+            self.invites[member.guild.id] = invs_after
+            raise(exc)
             return
 
 
